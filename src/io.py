@@ -1,16 +1,36 @@
 """
-Stage A: loads the raw Big Data Bowl 2025 CSVs into DataFrames.
+Stage A: loads raw Big Data Bowl CSVs into DataFrames.
 
-Expected files under data/raw/ (as unzipped from the Kaggle competition):
+BDB 2025 files under data/raw/ (as unzipped from the Kaggle competition):
     games.csv
     plays.csv
     players.csv
     player_play.csv
     tracking_week_1.csv ... tracking_week_9.csv
+
+BDB 2026 Analytics files under data/raw/ (currently the active dataset —
+see src/features_2026.py / src/labels_2026.py):
+    supplementary_data.csv       - one row per pass play, PFF-labeled
+    train/input_2023_w01.csv ... - per-frame tracking, not needed for the
+                                    shell/success-rate pipeline since
+                                    supplementary_data.csv already has the
+                                    shell columns (box count, coverage).
 """
 import pandas as pd
 
 from src.config import RAW_DIR, NUM_TRACKING_WEEKS
+
+
+def load_supplementary() -> pd.DataFrame:
+    """BDB 2026: one row per pass play with PFF shell/outcome columns."""
+    return pd.read_csv(RAW_DIR / "supplementary_data.csv", low_memory=False)
+
+
+def load_week_input(week: int, season: int = 2023) -> pd.DataFrame:
+    """BDB 2026: per-frame tracking for one week (only needed if you want
+    to go beyond the shell columns already in supplementary_data.csv)."""
+    path = RAW_DIR / "train" / f"input_{season}_w{week:02d}.csv"
+    return pd.read_csv(path)
 
 
 def load_games() -> pd.DataFrame:

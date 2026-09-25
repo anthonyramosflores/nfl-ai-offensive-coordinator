@@ -40,14 +40,22 @@ def bucket_features(labeled_df):
     return df
 
 
-def build_success_rate_table(labeled_df, min_sample_size=MIN_SAMPLE_SIZE):
+def build_success_rate_table(labeled_df, shell_key_cols=None, min_sample_size=MIN_SAMPLE_SIZE):
     """
     One row per (shell, play_family): how often that play family has
     succeeded historically against that shell.
+
+    shell_key_cols lets this work for any dataset's shell definition (e.g.
+    BDB 2025's [safety_shell, defensive_personnel, box_bucket, motion_flag]
+    vs. BDB 2026's [coverage_shell, man_zone, box_bucket]) — the labeled_df
+    passed in must already have those columns bucketed (see bucket_features
+    for 2025, or src/features_2026.py for 2026).
     """
-    bucketed = bucket_features(labeled_df)
+    shell_key_cols = shell_key_cols or SHELL_KEY_COLS
+    if not set(shell_key_cols) <= set(labeled_df.columns) and "box_count" in labeled_df.columns:
+        labeled_df = bucket_features(labeled_df)
     table = (
-        bucketed.groupby(SHELL_KEY_COLS + ["play_family"])
+        labeled_df.groupby(shell_key_cols + ["play_family"])
         .agg(n_plays=("success", "size"), success_rate=("success", "mean"),
              avg_epa=("epa", "mean"))
         .reset_index()
@@ -56,44 +64,36 @@ def build_success_rate_table(labeled_df, min_sample_size=MIN_SAMPLE_SIZE):
     return table
 
 
-def _relaxation_stages(shell):
+def _relaxation_stages(shell, shell_key_cols):
     """
-    Progressively drop constraints (most to least specific) so a rare
-    shell still gets an answer, from the most specific match down to
-    "what generally works." Each stage is a dict of filters to apply.
+    Progressively drop constraints, least-specific first, so a rare shell
+    still gets an answer: exact match -> drop the last key -> drop the
+    last two keys -> ... -> just the first (most important) key -> whatever
+    generally works league-wide. Each stage is a dict of filters to apply.
     """
-    full = dict(shell)
-    yield "exact_shell", dict(full)
+    yield "exact_shell", dict(shell)
 
-    no_motion = dict(full)
-    no_motion.pop("motion_flag", None)
-    yield "ignore_motion", no_motion
-
-    no_box = dict(no_motion)
-    no_box.pop("box_bucket", None)
-    yield "ignore_motion_and_box", no_box
-
-    safety_only = {"safety_shell": full["safety_shell"]}
-    yield "safety_shell_only", safety_only
+    for keep_n in range(len(shell_key_cols) - 1, 0, -1):
+        kept_cols = shell_key_cols[:keep_n]
+        stage_name = "partial_" + "_".join(kept_cols)
+        yield stage_name, {col: shell[col] for col in kept_cols}
 
     yield "league_wide", {}
 
 
-def recommend_play(success_table, safety_shell, defensive_personnel,
-                    box_bucket, motion_flag, min_sample_size=MIN_SAMPLE_SIZE):
+def recommend_play(success_table, shell, shell_key_cols=None, min_sample_size=MIN_SAMPLE_SIZE):
     """
     Return the play_family with the best historical success rate against
-    the given shell, relaxing the match if the exact shell is too rare
-    to trust. Returns None if the table has no data at all.
-    """
-    shell = {
-        "safety_shell": safety_shell,
-        "defensive_personnel": defensive_personnel,
-        "box_bucket": box_bucket,
-        "motion_flag": motion_flag,
-    }
+    the given shell (a dict of {shell_key_col: value}), relaxing the match
+    if the exact shell is too rare to trust. Returns None if the table has
+    no data at all.
 
-    for match_level, filters in _relaxation_stages(shell):
+    shell_key_cols should list the shell's dimensions in priority order
+    (most important to keep first) — see build_success_rate_table.
+    """
+    shell_key_cols = shell_key_cols or SHELL_KEY_COLS
+
+    for match_level, filters in _relaxation_stages(shell, shell_key_cols):
         subset = success_table
         for col, value in filters.items():
             subset = subset[subset[col] == value]
@@ -111,14 +111,12 @@ def recommend_play(success_table, safety_shell, defensive_personnel,
     return None
 
 
-def top_alternatives(success_table, safety_shell, defensive_personnel,
-                      box_bucket, motion_flag, n=3, min_sample_size=MIN_SAMPLE_SIZE):
+def top_alternatives(success_table, shell, shell_key_cols=None, n=3,
+                      min_sample_size=MIN_SAMPLE_SIZE):
     """The top-n play families for an exact shell match, for comparison."""
-    subset = success_table[
-        (success_table["safety_shell"] == safety_shell)
-        & (success_table["defensive_personnel"] == defensive_personnel)
-        & (success_table["box_bucket"] == box_bucket)
-        & (success_table["motion_flag"] == motion_flag)
-        & (success_table["n_plays"] >= min_sample_size)
-    ]
+    shell_key_cols = shell_key_cols or SHELL_KEY_COLS
+    subset = success_table
+    for col in shell_key_cols:
+        subset = subset[subset[col] == shell[col]]
+    subset = subset[subset["n_plays"] >= min_sample_size]
     return subset.sort_values("success_rate", ascending=False).head(n)

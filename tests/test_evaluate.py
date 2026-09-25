@@ -45,10 +45,11 @@ def test_recommend_play_picks_higher_success_rate():
     labeled_df = pd.DataFrame(rows)
 
     table = build_success_rate_table(labeled_df, min_sample_size=5)
-    result = recommend_play(
-        table, safety_shell="2-high", defensive_personnel="Base",
-        box_bucket="light", motion_flag=False, min_sample_size=5,
-    )
+    shell = {
+        "safety_shell": "2-high", "defensive_personnel": "Base",
+        "box_bucket": "light", "motion_flag": False,
+    }
+    result = recommend_play(table, shell, min_sample_size=5)
 
     assert result is not None
     assert result["play_family"] == "inside_zone"
@@ -66,10 +67,11 @@ def test_recommend_play_falls_back_when_shell_too_rare():
     labeled_df = pd.DataFrame(rows)
 
     table = build_success_rate_table(labeled_df, min_sample_size=5)
-    result = recommend_play(
-        table, safety_shell="1-high", defensive_personnel="Base",
-        box_bucket="light", motion_flag=False, min_sample_size=5,
-    )
+    shell = {
+        "safety_shell": "1-high", "defensive_personnel": "Base",
+        "box_bucket": "light", "motion_flag": False,
+    }
+    result = recommend_play(table, shell, min_sample_size=5)
 
     assert result is not None
     assert result["match_level"] != "exact_shell"
@@ -80,8 +82,9 @@ def test_recommend_play_returns_none_without_any_data():
         "box_count", "num_high_safeties", "defensive_personnel",
         "motion_flag", "play_family", "success", "epa",
     ]), min_sample_size=5)
-    result = recommend_play(
-        empty_table, safety_shell="2-high", defensive_personnel="Base",
-        box_bucket="light", motion_flag=False, min_sample_size=5,
-    )
+    shell = {
+        "safety_shell": "2-high", "defensive_personnel": "Base",
+        "box_bucket": "light", "motion_flag": False,
+    }
+    result = recommend_play(empty_table, shell, min_sample_size=5)
     assert result is None
