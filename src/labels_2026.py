@@ -47,8 +47,9 @@ def assign_play_family(supplementary_df):
 
 def build_labeled_dataset(supplementary_df, success_epa_threshold=SUCCESS_EPA_THRESHOLD):
     """Filter to called pass plays and attach play_family + success/EPA."""
+    # Real data stores this as the string "Y"/"N", not a Python bool.
     df = supplementary_df[
-        supplementary_df["play_nullified_by_penalty"] != True  # noqa: E712
+        supplementary_df["play_nullified_by_penalty"] != "Y"
     ].copy()
     df = df[~df["dropback_type"].isin(SCRAMBLE_DROPBACK_TYPES)]
 

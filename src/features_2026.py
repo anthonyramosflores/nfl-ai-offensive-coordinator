@@ -33,9 +33,16 @@ def bucket_coverage_shell(team_coverage_type):
 
 
 def build_feature_table(supplementary_df):
-    """One row per play, with the defensive shell already bucketed."""
+    """One row per play, with the defensive shell already bucketed.
+
+    Rows with no coverage label at all (a handful in the real data) are
+    dropped rather than kept as their own "unknown" shell -- an "unknown"
+    bucket isn't a shell an offense actually prepares for, and letting it
+    into the success-rate table just adds noisy, unusable rows.
+    """
     df = supplementary_df.copy()
     df["box_bucket"] = df["defenders_in_the_box"].apply(bucket_box_count)
     df["coverage_shell"] = df["team_coverage_type"].apply(bucket_coverage_shell)
     df["man_zone"] = df["team_coverage_man_zone"].fillna("unknown")
+    df = df[(df["coverage_shell"] != "unknown") & (df["man_zone"] != "unknown")]
     return df

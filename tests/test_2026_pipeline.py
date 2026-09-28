@@ -12,7 +12,7 @@ from src.evaluate import build_success_rate_table, recommend_play
 
 def _play(pass_length, dropback_type="TRADITIONAL", team_coverage_type="COVER_3_ZONE",
           team_coverage_man_zone="ZONE_COVERAGE", defenders_in_the_box=6,
-          epa=0.2, nullified=False):
+          epa=0.2, nullified="N"):
     return {
         "game_id": 1, "play_id": 1, "pass_length": pass_length,
         "dropback_type": dropback_type, "team_coverage_type": team_coverage_type,
@@ -53,13 +53,28 @@ def test_play_family_depth_buckets():
 
 
 def test_build_labeled_dataset_drops_scrambles_and_penalties():
+    # play_nullified_by_penalty is the string "Y"/"N" in the real data, not
+    # a Python bool -- this pins that comparison down.
     df = pd.DataFrame([
         _play(pass_length=10, dropback_type="SCRAMBLE"),
-        _play(pass_length=10, nullified=True),
+        _play(pass_length=10, nullified="Y"),
         _play(pass_length=10),
     ])
     labeled = build_labeled_dataset(df)
     assert len(labeled) == 1
+
+
+def test_build_feature_table_drops_unknown_shell():
+    df = pd.DataFrame([
+        _play(pass_length=10, team_coverage_type="COVER_3_ZONE"),
+        _play(pass_length=10, team_coverage_type=None),
+        _play(pass_length=10, team_coverage_type="COVER_3_ZONE",
+              team_coverage_man_zone=None),
+    ])
+    featured = build_feature_table(df)
+    assert len(featured) == 1
+    assert (featured["coverage_shell"] != "unknown").all()
+    assert (featured["man_zone"] != "unknown").all()
 
 
 def test_feature_table_and_recommend_end_to_end():

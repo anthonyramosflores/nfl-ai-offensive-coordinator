@@ -15,7 +15,15 @@ MIN_SAMPLE_SIZE = 10
 BOX_BUCKET_EDGES = [(5, "light"), (6, "standard"), (7, "heavy")]
 BOX_BUCKET_DEFAULT = "stacked"
 
-SHELL_KEY_COLS = ["safety_shell", "defensive_personnel", "box_bucket", "motion_flag"]
+# Default shell definition for the active pipeline (BDB 2026 -- see
+# src/features_2026.py). Callers using the dormant BDB 2025 pipeline must
+# pass their own shell_key_cols (e.g. LEGACY_2025_SHELL_KEY_COLS below)
+# explicitly rather than relying on this default.
+SHELL_KEY_COLS = ["coverage_shell", "man_zone", "box_bucket"]
+
+LEGACY_2025_SHELL_KEY_COLS = [
+    "safety_shell", "defensive_personnel", "box_bucket", "motion_flag",
+]
 
 
 def bucket_box_count(box_count):

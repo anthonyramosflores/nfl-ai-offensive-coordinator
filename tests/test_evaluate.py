@@ -1,10 +1,17 @@
 """
 Unit tests for the empirical success-rate lookup table in src/evaluate.py
 — this is the actual "coordinator" recommendation logic.
+
+These tests exercise the shell-key-cols machinery using the dormant BDB
+2025 shell schema (safety_shell/defensive_personnel/motion_flag), passed
+explicitly via LEGACY_2025_SHELL_KEY_COLS since that's no longer the
+module's default. See tests/test_2026_pipeline.py for the active
+BDB 2026 shell schema.
 """
 import pandas as pd
 
 from src.evaluate import (
+    LEGACY_2025_SHELL_KEY_COLS,
     bucket_box_count,
     bucket_safety_count,
     build_success_rate_table,
@@ -44,12 +51,16 @@ def test_recommend_play_picks_higher_success_rate():
              for s in [True] * 3 + [False] * 7]
     labeled_df = pd.DataFrame(rows)
 
-    table = build_success_rate_table(labeled_df, min_sample_size=5)
+    table = build_success_rate_table(
+        labeled_df, shell_key_cols=LEGACY_2025_SHELL_KEY_COLS, min_sample_size=5
+    )
     shell = {
         "safety_shell": "2-high", "defensive_personnel": "Base",
         "box_bucket": "light", "motion_flag": False,
     }
-    result = recommend_play(table, shell, min_sample_size=5)
+    result = recommend_play(
+        table, shell, shell_key_cols=LEGACY_2025_SHELL_KEY_COLS, min_sample_size=5
+    )
 
     assert result is not None
     assert result["play_family"] == "inside_zone"
@@ -66,12 +77,16 @@ def test_recommend_play_falls_back_when_shell_too_rare():
              for s in [True] * 9 + [False] * 1]
     labeled_df = pd.DataFrame(rows)
 
-    table = build_success_rate_table(labeled_df, min_sample_size=5)
+    table = build_success_rate_table(
+        labeled_df, shell_key_cols=LEGACY_2025_SHELL_KEY_COLS, min_sample_size=5
+    )
     shell = {
         "safety_shell": "1-high", "defensive_personnel": "Base",
         "box_bucket": "light", "motion_flag": False,
     }
-    result = recommend_play(table, shell, min_sample_size=5)
+    result = recommend_play(
+        table, shell, shell_key_cols=LEGACY_2025_SHELL_KEY_COLS, min_sample_size=5
+    )
 
     assert result is not None
     assert result["match_level"] != "exact_shell"
@@ -81,10 +96,12 @@ def test_recommend_play_returns_none_without_any_data():
     empty_table = build_success_rate_table(pd.DataFrame(columns=[
         "box_count", "num_high_safeties", "defensive_personnel",
         "motion_flag", "play_family", "success", "epa",
-    ]), min_sample_size=5)
+    ]), shell_key_cols=LEGACY_2025_SHELL_KEY_COLS, min_sample_size=5)
     shell = {
         "safety_shell": "2-high", "defensive_personnel": "Base",
         "box_bucket": "light", "motion_flag": False,
     }
-    result = recommend_play(empty_table, shell, min_sample_size=5)
+    result = recommend_play(
+        empty_table, shell, shell_key_cols=LEGACY_2025_SHELL_KEY_COLS, min_sample_size=5
+    )
     assert result is None
